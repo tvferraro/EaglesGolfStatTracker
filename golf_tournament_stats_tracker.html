@@ -1,0 +1,1973 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>EagleStats - Tournament Golf Tracker & Cloud Sync</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Phosphor Icons -->
+  <script src="https://unpkg.com/@phosphor-icons/web"></script>
+  <!-- Google Fonts Inter -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Inter', 'sans-serif'],
+          },
+          colors: {
+            golf: {
+              50: '#f0fdf4',
+              100: '#dcfce7',
+              200: '#bbf7d0',
+              500: '#22c55e',
+              600: '#16a34a',
+              700: '#15803d',
+              800: '#166534',
+              900: '#14532d',
+              950: '#052e16',
+            },
+            gold: {
+              400: '#fbbf24',
+              500: '#f59e0b',
+              600: '#d97706'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    body {
+      -webkit-tap-highlight-color: transparent;
+      user-select: none;
+    }
+    input, textarea, select {
+      user-select: text;
+    }
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+    .pb-safe {
+      padding-bottom: env(safe-area-inset-bottom, 1.25rem);
+    }
+    .pt-safe {
+      padding-top: env(safe-area-inset-top, 0.75rem);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 antialiased font-sans min-h-screen flex flex-col justify-between">
+
+  <!-- TOP APP HEADER -->
+  <header class="bg-golf-950 text-white sticky top-0 z-40 shadow-md pt-safe border-b border-golf-800/80">
+    <div class="max-w-4xl mx-auto px-4 py-2.5 flex items-center justify-between">
+      <div class="flex items-center space-x-2.5">
+        <div class="w-9 h-9 rounded-xl bg-golf-800 border border-golf-600/50 flex items-center justify-center text-gold-400 font-black text-lg shadow-inner">
+          <i class="ph-bold ph-golf"></i>
+        </div>
+        <div>
+          <div class="flex items-center gap-1.5">
+            <h1 class="text-sm font-black tracking-tight uppercase leading-none">EagleStats</h1>
+            <span id="roleBadge" class="bg-emerald-950 text-emerald-300 border border-emerald-600/60 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider">Golfer</span>
+          </div>
+          <p id="subHeaderStatus" class="text-[11px] text-golf-200/80 font-medium truncate max-w-[200px] sm:max-w-none">Broomfield Golf Tournaments</p>
+        </div>
+      </div>
+
+      <!-- Header Action Controls -->
+      <div class="flex items-center space-x-2">
+        <!-- Cloud Sync Status Indicator -->
+        <button onclick="openSyncModal()" id="cloudStatusBtn" class="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-golf-900 border border-golf-700/80 text-[11px] font-bold text-slate-200 hover:text-white transition" title="Cloud / Google Sheets Sync Status">
+          <span id="cloudStatusDot" class="w-2 h-2 rounded-full bg-amber-400 animate-pulse"></span>
+          <span id="cloudStatusText" class="hidden sm:inline">Sync Active</span>
+        </button>
+
+        <!-- Switch Role (Golfer vs Coach) -->
+        <button onclick="promptRoleSwitch()" class="px-2.5 py-1.5 rounded-lg bg-golf-800 hover:bg-golf-700 text-xs font-bold text-golf-100 border border-golf-700 flex items-center gap-1 shadow-sm transition">
+          <i class="ph-bold ph-user-switch text-sm text-gold-400"></i>
+          <span id="switchRoleBtnText" class="hidden sm:inline">Coach Mode</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Active User & Golfer Selection Ribbon -->
+    <div class="bg-golf-900/90 px-4 py-1.5 border-t border-golf-800/60 text-xs">
+      <div class="max-w-4xl mx-auto flex items-center justify-between">
+        <div class="flex items-center space-x-2 overflow-hidden">
+          <span class="text-slate-400 uppercase font-black text-[10px]">Active Golfer:</span>
+          <button onclick="openGolferSwitchModal()" class="flex items-center space-x-1.5 font-bold text-white hover:text-gold-400 transition truncate group">
+            <span id="ribbonGolferName" class="truncate font-black text-xs text-gold-400">Select Athlete</span>
+            <i class="ph-bold ph-caret-down text-slate-400 text-xs group-hover:text-gold-400"></i>
+          </button>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <span id="ribbonPrivacyNotice" class="text-[10px] text-slate-300 font-semibold flex items-center gap-1">
+            <i class="ph-bold ph-lock-key text-gold-400"></i> Private Stats
+          </span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="max-w-4xl w-full mx-auto flex-1 p-3 sm:p-5">
+
+    <!-- VIEW 1: 18-HOLE TOURNAMENT SCORECARD ENTRY -->
+    <section id="viewEntry" class="space-y-4">
+      
+      <!-- Tournament Header & Course Selector -->
+      <div class="bg-white rounded-3xl p-4 shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-3">
+        <div class="flex-1 min-w-[200px]">
+          <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Tournament Course</label>
+          <select id="courseSelect" onchange="handleCourseChange()" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs sm:text-sm font-bold text-slate-800 focus:outline-none focus:ring-2 focus:ring-golf-600">
+            <!-- Populated via JS -->
+          </select>
+        </div>
+
+        <div class="flex items-center gap-2 w-full sm:w-auto">
+          <div class="flex-1 sm:w-36">
+            <label class="block text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">Round Date</label>
+            <input type="date" id="roundDateInput" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-2.5 py-1.5 text-xs font-semibold text-slate-700">
+          </div>
+          <button onclick="toggleCardOrHoleView()" id="viewToggleBtn" class="mt-4 sm:mt-0 px-3 py-2 rounded-xl border border-slate-200 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center gap-1.5">
+            <i class="ph-bold ph-table text-base"></i>
+            <span class="hidden sm:inline">Scorecard Grid</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Live Metric Banner -->
+      <div class="grid grid-cols-4 sm:grid-cols-6 gap-2 text-center">
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">Total Score</span>
+          <span id="liveTotalScore" class="text-lg font-black text-slate-900">0</span>
+          <span id="liveScoreToPar" class="text-[10px] font-bold text-slate-500 block">E</span>
+        </div>
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">Thru</span>
+          <span id="liveThruHoles" class="text-lg font-black text-slate-900">0</span>
+          <span class="text-[10px] font-semibold text-slate-400 block">of 18</span>
+        </div>
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">Fairways</span>
+          <span id="liveFairwayStat" class="text-lg font-black text-emerald-700">0/0</span>
+          <span id="liveFairwayPct" class="text-[10px] font-bold text-emerald-600 block">0%</span>
+        </div>
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">GIR</span>
+          <span id="liveGirStat" class="text-lg font-black text-blue-700">0/0</span>
+          <span id="liveGirPct" class="text-[10px] font-bold text-blue-600 block">0%</span>
+        </div>
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm hidden sm:block">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">Total Putts</span>
+          <span id="liveTotalPutts" class="text-lg font-black text-slate-800">0</span>
+          <span id="liveAvgPutts" class="text-[10px] font-semibold text-slate-500 block">0.0/h</span>
+        </div>
+        <div class="bg-white rounded-2xl p-2 border border-slate-200/90 shadow-sm hidden sm:block">
+          <span class="block text-[9px] font-black text-slate-400 uppercase">Penalties</span>
+          <span id="liveTotalPenalties" class="text-lg font-black text-rose-600">0</span>
+          <span id="liveMentalCount" class="text-[10px] font-bold text-amber-600 block">0 Mental</span>
+        </div>
+      </div>
+
+      <!-- HOLE-BY-HOLE RECORDER -->
+      <div id="singleHoleCard" class="bg-white rounded-3xl p-4 sm:p-6 shadow-sm border border-slate-200 space-y-4">
+        
+        <!-- Hole Navigation Row -->
+        <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+          <button onclick="navigateHole(-1)" class="w-10 h-10 rounded-2xl bg-slate-100 active:bg-slate-200 text-slate-700 flex items-center justify-center font-bold transition">
+            <i class="ph-bold ph-caret-left text-lg"></i>
+          </button>
+          
+          <div class="text-center">
+            <div class="flex items-center justify-center gap-2">
+              <span class="text-2xl font-black text-slate-900 tracking-tight" id="displayHoleNum">Hole 1</span>
+              <span id="displayHoleParBadge" class="bg-golf-100 text-golf-800 text-xs font-black px-2.5 py-1 rounded-full border border-golf-300">
+                PAR 4
+              </span>
+            </div>
+            <p class="text-xs text-slate-400 font-medium" id="holeParSubtitle">Tournament Hole</p>
+          </div>
+
+          <button onclick="navigateHole(1)" class="w-10 h-10 rounded-2xl bg-slate-100 active:bg-slate-200 text-slate-700 flex items-center justify-center font-bold transition">
+            <i class="ph-bold ph-caret-right text-lg"></i>
+          </button>
+        </div>
+
+        <!-- 18 Hole Scroller Strip -->
+        <div class="flex gap-1.5 overflow-x-auto pb-1 no-scrollbar -mx-1 px-1">
+          <div id="holePillsContainer" class="flex gap-1.5">
+            <!-- 18 Holes generated dynamically -->
+          </div>
+        </div>
+
+        <!-- STROKES / HOLE TOTAL -->
+        <div class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="text-xs font-black text-slate-800 uppercase tracking-wide">Hole Score / Strokes</span>
+              <p class="text-[11px] text-slate-400">Total strokes taken on this hole</p>
+            </div>
+            <div class="flex items-center gap-3">
+              <button onclick="adjustScore(-1)" class="w-10 h-10 rounded-xl bg-white border border-slate-300 active:scale-95 flex items-center justify-center text-slate-700 shadow-sm font-black text-lg">
+                <i class="ph-bold ph-minus"></i>
+              </button>
+              <div class="w-14 text-center">
+                <span id="currentScoreDisplay" class="text-3xl font-black text-slate-900">4</span>
+                <span id="scoreRelationDisplay" class="block text-[10px] font-bold text-slate-500">Par</span>
+              </div>
+              <button onclick="adjustScore(1)" class="w-10 h-10 rounded-xl bg-white border border-slate-300 active:scale-95 flex items-center justify-center text-slate-700 shadow-sm font-black text-lg">
+                <i class="ph-bold ph-plus"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 1. FAIRWAY HIT (LOCKED ON PAR 3) -->
+        <div id="fairwaySectionContainer" class="transition-all">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="ph-bold ph-arrows-out-line-horizontal text-golf-600"></i>
+              1. Fairway in Regulation (FIR)
+            </label>
+            <span id="par3FairwayBadge" class="hidden text-[10px] font-bold uppercase bg-amber-100 text-amber-900 px-2.5 py-0.5 rounded-full border border-amber-300">
+              Par 3 - No Fairway (N/A)
+            </span>
+          </div>
+
+          <div id="fairwayButtonsGrid" class="grid grid-cols-3 gap-2">
+            <button type="button" onclick="setFairway('left')" id="btnFairwayLeft" class="fairway-btn py-3 px-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex flex-col items-center gap-1 transition">
+              <i class="ph-bold ph-arrow-left text-base text-amber-500"></i>
+              Missed Left
+            </button>
+            <button type="button" onclick="setFairway('hit')" id="btnFairwayHit" class="fairway-btn py-3 px-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex flex-col items-center gap-1 transition">
+              <i class="ph-bold ph-check-circle text-base text-emerald-600"></i>
+              Fairway Hit
+            </button>
+            <button type="button" onclick="setFairway('right')" id="btnFairwayRight" class="fairway-btn py-3 px-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex flex-col items-center gap-1 transition">
+              <i class="ph-bold ph-arrow-right text-base text-amber-500"></i>
+              Missed Right
+            </button>
+          </div>
+          <div id="par3DisabledNotice" class="hidden py-2.5 px-3 bg-slate-100 rounded-xl text-center text-xs font-semibold text-slate-500 border border-slate-200">
+            Par 3 hole: Fairways are skipped and automatically excluded from total fairway stats.
+          </div>
+        </div>
+
+        <!-- 2. GREEN IN REGULATION (GIR) -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="ph-bold ph-circle-dashed text-blue-600"></i>
+              2. Green in Regulation (GIR)
+            </label>
+            <span class="text-[10px] text-slate-400 font-semibold">(Par - 2 strokes to green)</span>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" onclick="setGir(true)" id="btnGirYes" class="gir-btn py-3 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex items-center justify-center gap-2 transition">
+              <i class="ph-bold ph-check text-emerald-600 text-base"></i>
+              Yes (GIR Hit)
+            </button>
+            <button type="button" onclick="setGir(false)" id="btnGirNo" class="gir-btn py-3 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex items-center justify-center gap-2 transition">
+              <i class="ph-bold ph-x text-rose-500 text-base"></i>
+              No (Missed Green)
+            </button>
+          </div>
+        </div>
+
+        <!-- 3. NUMBER OF PUTTS -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="ph-bold ph-crosshair text-slate-700"></i>
+              3. Number of Putts
+            </label>
+            <span id="puttIndicatorText" class="text-[10px] font-bold text-slate-500">2 Putts</span>
+          </div>
+          <div class="grid grid-cols-5 gap-2">
+            <button type="button" onclick="setPutts(0)" id="putt0" class="putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm active:scale-95 transition">0</button>
+            <button type="button" onclick="setPutts(1)" id="putt1" class="putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm active:scale-95 transition">1</button>
+            <button type="button" onclick="setPutts(2)" id="putt2" class="putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm active:scale-95 transition">2</button>
+            <button type="button" onclick="setPutts(3)" id="putt3" class="putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm active:scale-95 transition">3</button>
+            <button type="button" onclick="setPutts(4)" id="putt4" class="putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm active:scale-95 transition">4+</button>
+          </div>
+        </div>
+
+        <!-- 4. PENALTY SHOTS -->
+        <div>
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="ph-bold ph-warning-circle text-rose-600"></i>
+              4. Penalty Strokes (OB, Hazard, Water)
+            </label>
+          </div>
+          <div class="grid grid-cols-4 gap-2">
+            <button type="button" onclick="setPenalties(0)" id="pen0" class="pen-btn py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 transition">0 Pen</button>
+            <button type="button" onclick="setPenalties(1)" id="pen1" class="pen-btn py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 transition">1</button>
+            <button type="button" onclick="setPenalties(2)" id="pen2" class="pen-btn py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 transition">2</button>
+            <button type="button" onclick="setPenalties(3)" id="pen3" class="pen-btn py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 transition">3+</button>
+          </div>
+        </div>
+
+        <!-- 5. MENTAL MISTAKES -->
+        <div class="bg-amber-50/70 rounded-2xl p-3 border border-amber-200">
+          <div class="flex items-center justify-between mb-2">
+            <label class="text-xs font-black text-amber-950 uppercase tracking-wide flex items-center gap-1.5">
+              <i class="ph-bold ph-brain text-amber-600 text-base"></i>
+              5. Mental Mistakes / Lack of Discipline
+            </label>
+            <span id="mentalCountBadge" class="bg-amber-200 text-amber-900 text-[10px] font-black px-2 py-0.5 rounded-full">
+              0 Tagged
+            </span>
+          </div>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-3 gap-1.5">
+            <button type="button" onclick="toggleMentalTag('Rushed Routine')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-timer text-amber-600"></i> Rushed Routine
+            </button>
+            <button type="button" onclick="toggleMentalTag('Wrong Aim / Target')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-target text-amber-600"></i> Bad Target
+            </button>
+            <button type="button" onclick="toggleMentalTag('Wrong Club')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-question text-amber-600"></i> Club Choice
+            </button>
+            <button type="button" onclick="toggleMentalTag('Anger / Emotion')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-flame text-amber-600"></i> Anger / Tilt
+            </button>
+            <button type="button" onclick="toggleMentalTag('Lapse in Focus')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-eye-closed text-amber-600"></i> Lapse in Focus
+            </button>
+            <button type="button" onclick="toggleMentalTag('Hero Shot Attempt')" class="mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-shield-warning text-amber-600"></i> Hero Shot
+            </button>
+          </div>
+        </div>
+
+        <!-- HOLE NOTES -->
+        <div>
+          <label class="block text-xs font-bold text-slate-600 uppercase mb-1">Hole Notes (Optional)</label>
+          <input type="text" id="holeNotesInput" placeholder="e.g., Driver into fairway bunker, saved par from 6 feet..." onchange="saveHoleNotes(this.value)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-golf-600">
+        </div>
+
+        <!-- STEPPER BOTTOM NAVIGATION -->
+        <div class="flex items-center gap-2 pt-2 border-t border-slate-100">
+          <button onclick="navigateHole(-1)" class="flex-1 py-3 rounded-xl border border-slate-300 bg-slate-50 hover:bg-slate-100 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5">
+            <i class="ph-bold ph-arrow-left"></i> Previous Hole
+          </button>
+          <button onclick="navigateHole(1)" class="flex-1 py-3 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md active:scale-98">
+            Next Hole <i class="ph-bold ph-arrow-right"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- FULL SCORECARD TABLE (HIDDEN BY DEFAULT) -->
+      <div id="fullScorecardSection" class="hidden bg-white rounded-3xl p-4 shadow-sm border border-slate-200 overflow-hidden space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-xs font-black text-slate-800 uppercase tracking-tight">Full 18-Hole Card</h3>
+          <button onclick="toggleCardOrHoleView()" class="text-xs font-bold text-golf-700 bg-golf-50 px-2.5 py-1 rounded-lg border border-golf-200">
+            Back to Step Entry
+          </button>
+        </div>
+        <div class="overflow-x-auto no-scrollbar -mx-4 px-4">
+          <table class="w-full text-center border-collapse text-xs min-w-[600px]">
+            <thead>
+              <tr class="bg-slate-100 text-slate-600 font-black uppercase text-[10px] border-b border-slate-200">
+                <th class="p-2 text-left">Hole</th>
+                <th class="p-1">1</th><th class="p-1">2</th><th class="p-1">3</th><th class="p-1">4</th><th class="p-1">5</th><th class="p-1">6</th><th class="p-1">7</th><th class="p-1">8</th><th class="p-1">9</th>
+                <th class="p-1 bg-slate-200 text-slate-800 font-black">OUT</th>
+                <th class="p-1">10</th><th class="p-1">11</th><th class="p-1">12</th><th class="p-1">13</th><th class="p-1">14</th><th class="p-1">15</th><th class="p-1">16</th><th class="p-1">17</th><th class="p-1">18</th>
+                <th class="p-1 bg-slate-200 text-slate-800 font-black">IN</th>
+                <th class="p-1 bg-golf-900 text-white font-black">TOT</th>
+              </tr>
+            </thead>
+            <tbody id="scorecardTableBody" class="divide-y divide-slate-100 font-medium text-slate-700">
+              <!-- Populated dynamically -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- COMPLETE & SYNC BUTTON -->
+      <div class="pt-2">
+        <button onclick="confirmAndFinishRound()" class="w-full py-4 rounded-2xl bg-golf-700 hover:bg-golf-800 text-white font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-golf-700/25 active:scale-98 transition">
+          <i class="ph-bold ph-cloud-arrow-up text-lg"></i>
+          Complete & Save Round (Sync to Coach & Player)
+        </button>
+      </div>
+
+    </section>
+
+    <!-- VIEW 2: GOLFER INDIVIDUAL DASHBOARD (Private File) -->
+    <section id="viewStats" class="hidden space-y-4">
+      
+      <!-- Golfer File Card -->
+      <div class="bg-gradient-to-br from-golf-900 to-golf-950 text-white rounded-3xl p-5 shadow-lg border border-golf-800">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="bg-gold-500 text-golf-950 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">Golfer Personal Stats</span>
+              <span id="statsPlayerGrad" class="text-xs text-golf-200 font-semibold">Broomfield Golf</span>
+            </div>
+            <h2 id="statsGolferName" class="text-2xl font-black text-white">Select a Golfer</h2>
+            <p id="statsRoundsCount" class="text-xs text-golf-200 mt-0.5">0 Tournament Rounds Saved</p>
+          </div>
+
+          <div class="flex items-center gap-2">
+            <button onclick="exportActiveGolferCSV()" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-download-simple"></i> Download My CSV
+            </button>
+            <button onclick="startFreshRoundForGolfer()" class="bg-golf-500 hover:bg-golf-600 text-golf-950 text-xs font-black px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
+              <i class="ph-bold ph-plus-circle"></i> New Round
+            </button>
+          </div>
+        </div>
+
+        <!-- 4 Core Metric Tiles -->
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5 mt-5 pt-4 border-t border-golf-800/80">
+          <div class="bg-white/5 rounded-2xl p-2.5 border border-white/10">
+            <span class="block text-[10px] text-golf-200 uppercase font-bold">Scoring Avg</span>
+            <span id="aggAvgScore" class="text-xl font-black text-white">--</span>
+            <span id="aggScoreToPar" class="text-[10px] text-golf-300 block">-- to par</span>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-2.5 border border-white/10">
+            <span class="block text-[10px] text-golf-200 uppercase font-bold">Fairways Hit</span>
+            <span id="aggFirPct" class="text-xl font-black text-emerald-400">--%</span>
+            <span id="aggFirRatio" class="text-[10px] text-golf-300 block">--</span>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-2.5 border border-white/10">
+            <span class="block text-[10px] text-golf-200 uppercase font-bold">GIR %</span>
+            <span id="aggGirPct" class="text-xl font-black text-blue-400">--%</span>
+            <span id="aggGirRatio" class="text-[10px] text-golf-300 block">--</span>
+          </div>
+          <div class="bg-white/5 rounded-2xl p-2.5 border border-white/10">
+            <span class="block text-[10px] text-golf-200 uppercase font-bold">Putts / 18 Holes</span>
+            <span id="aggAvgPutts" class="text-xl font-black text-gold-400">--</span>
+            <span id="aggPuttsPerHole" class="text-[10px] text-golf-300 block">-- / hole</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mental Coaching & Scrambling Breakdown -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm">
+          <div class="flex items-center justify-between mb-3">
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5">
+              <i class="ph-bold ph-brain text-amber-500 text-base"></i> Mental Breakdown Frequency
+            </h4>
+            <span id="aggMentalPerRound" class="text-[10px] font-bold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-full border border-amber-200">
+              0 / round
+            </span>
+          </div>
+          <div id="mentalMistakesList" class="space-y-2">
+            <!-- Dynamically populated bars -->
+          </div>
+        </div>
+
+        <div class="bg-white rounded-2xl p-4 border border-slate-200 shadow-sm flex flex-col justify-between">
+          <div>
+            <h4 class="text-xs font-black text-slate-800 uppercase tracking-tight flex items-center gap-1.5 mb-3">
+              <i class="ph-bold ph-shield-check text-golf-600 text-base"></i> Discipline & Up-and-Downs
+            </h4>
+            <div class="grid grid-cols-2 gap-2 text-center mb-3">
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-400 uppercase block">Scrambling %</span>
+                <span id="aggScramblingPct" class="text-xl font-black text-golf-700">--%</span>
+                <span class="text-[9px] text-slate-500 block">Par or better when missing GIR</span>
+              </div>
+              <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-400 uppercase block">Penalties / Rd</span>
+                <span id="aggPenaltiesPerRound" class="text-xl font-black text-rose-600">--</span>
+                <span class="text-[9px] text-slate-500 block">Strokes lost to hazards</span>
+              </div>
+            </div>
+          </div>
+          <p class="text-[11px] text-slate-400 italic">Discipline on approach and recovery keeps scores in contention.</p>
+        </div>
+      </div>
+
+      <!-- Golfer's Tournament History Log -->
+      <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-black text-slate-800 uppercase tracking-tight">Saved Tournament Rounds</h3>
+          <span id="roundHistoryCount" class="text-xs font-semibold text-slate-400">0 rounds</span>
+        </div>
+        <div id="roundsListContainer" class="space-y-2.5">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+    </section>
+
+    <!-- VIEW 3: COACH COMMAND CENTER & MASTER LEADERBOARD -->
+    <section id="viewCoach" class="hidden space-y-4">
+      
+      <div class="bg-gradient-to-br from-slate-900 to-golf-950 text-white rounded-3xl p-5 shadow-lg border border-slate-700">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="bg-gold-500 text-golf-950 text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider">Coach Command Hub</span>
+              <span class="text-xs text-slate-300 font-semibold">Master Team File</span>
+            </div>
+            <h2 class="text-2xl font-black text-white">Team Performance & Sync Center</h2>
+            <p class="text-xs text-slate-300 mt-0.5">Real-time sync to all player files and Google Sheets</p>
+          </div>
+
+          <div class="flex flex-wrap items-center gap-2">
+            <button onclick="openCourseModal()" class="bg-white/10 hover:bg-white/20 border border-white/20 text-white text-xs font-bold px-3 py-2 rounded-xl flex items-center gap-1.5 transition">
+              <i class="ph-bold ph-flag"></i> Manage Courses
+            </button>
+            <button onclick="exportMasterTeamCSV()" class="bg-golf-500 hover:bg-golf-600 text-golf-950 text-xs font-black px-3.5 py-2 rounded-xl flex items-center gap-1.5 shadow transition">
+              <i class="ph-bold ph-file-csv"></i> Export Team Master CSV
+            </button>
+          </div>
+        </div>
+
+        <!-- Coach Cloud Sync Status Strip -->
+        <div class="mt-4 pt-3 border-t border-slate-800 flex flex-wrap items-center justify-between gap-2 text-xs">
+          <div class="flex items-center gap-2">
+            <span class="text-slate-400 font-semibold">Google Sheets Sync Webhook:</span>
+            <span id="coachWebhookStatusBadge" class="bg-amber-900/60 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-700/50">
+              Not Connected
+            </span>
+          </div>
+          <button onclick="openSyncModal()" class="text-xs text-gold-400 font-bold hover:underline flex items-center gap-1">
+            <i class="ph-bold ph-gear"></i> Configure Sheets Sync
+          </button>
+        </div>
+      </div>
+
+      <!-- Quick Roster Inspection -->
+      <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-black text-slate-900">Team Roster & Player Files</h3>
+            <p class="text-xs text-slate-400">Click "Open File" on any golfer to immediately review their private stats</p>
+          </div>
+          <button onclick="openAddGolferModal()" class="py-2 px-3.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs flex items-center gap-1.5 shadow">
+            <i class="ph-bold ph-user-plus"></i> Add Golfer
+          </button>
+        </div>
+
+        <div id="coachRosterGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <!-- Populated dynamically -->
+        </div>
+      </div>
+
+      <!-- Master Team Leaderboard Table -->
+      <div class="bg-white rounded-3xl p-4 sm:p-5 border border-slate-200 shadow-sm space-y-3">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-base font-black text-slate-900">Tournament Leaderboard & Scoring Averages</h3>
+            <p class="text-xs text-slate-400">Sorted by lowest tournament scoring average</p>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto no-scrollbar -mx-4 px-4">
+          <table class="w-full text-left text-xs border-collapse">
+            <thead>
+              <tr class="bg-slate-50 border-b border-slate-200 text-slate-400 font-black uppercase text-[10px]">
+                <th class="p-3">Rank / Athlete</th>
+                <th class="p-3 text-center">Rounds</th>
+                <th class="p-3 text-center">Scoring Avg</th>
+                <th class="p-3 text-center">FIR %</th>
+                <th class="p-3 text-center">GIR %</th>
+                <th class="p-3 text-center">Putts/Rd</th>
+                <th class="p-3 text-center">Mental/Rd</th>
+                <th class="p-3 text-right">Player File</th>
+              </tr>
+            </thead>
+            <tbody id="masterLeaderboardBody" class="divide-y divide-slate-100 font-medium">
+              <!-- Dynamically populated -->
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- BOTTOM APP NAVIGATION BAR -->
+  <nav class="sticky bottom-0 bg-white/95 backdrop-blur-md border-t border-slate-200/90 z-40 pb-safe shadow-lg">
+    <div class="max-w-4xl mx-auto px-4 py-1.5 flex items-center justify-around">
+      <button onclick="switchTab('entry')" id="navBtnEntry" class="flex flex-col items-center py-1 px-3 rounded-xl text-golf-700 font-bold transition">
+        <i class="ph-bold ph-golf text-xl"></i>
+        <span class="text-[10px] mt-0.5">Round Entry</span>
+      </button>
+
+      <button onclick="switchTab('stats')" id="navBtnStats" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 font-semibold hover:text-slate-600 transition">
+        <i class="ph-bold ph-user text-xl"></i>
+        <span class="text-[10px] mt-0.5">My Stats</span>
+      </button>
+
+      <button onclick="switchTab('coach')" id="navBtnCoach" class="flex flex-col items-center py-1 px-3 rounded-xl text-slate-400 font-semibold hover:text-slate-600 transition">
+        <i class="ph-bold ph-shield-star text-xl"></i>
+        <span class="text-[10px] mt-0.5">Coach Hub</span>
+      </button>
+    </div>
+  </nav>
+
+  <!-- ==================== MODALS ==================== -->
+
+  <!-- MODAL: GOLFER SWITCHER & PIN VERIFICATION -->
+  <div id="golferSwitchModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-black text-slate-900">Select Your Profile</h3>
+          <p class="text-xs text-slate-400">Choose your name to access your private stats</p>
+        </div>
+        <button onclick="closeGolferSwitchModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <div id="golferSwitchList" class="space-y-1.5 max-h-64 overflow-y-auto pr-1">
+        <!-- Populated via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: COACH PIN AUTHENTICATION -->
+  <div id="coachAuthModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-xs w-full p-5 shadow-2xl border border-slate-200 text-center space-y-4">
+      <div class="w-12 h-12 rounded-2xl bg-golf-50 text-golf-800 flex items-center justify-center mx-auto text-2xl font-black border border-golf-200">
+        <i class="ph-bold ph-lock-key"></i>
+      </div>
+      <div>
+        <h3 class="text-base font-black text-slate-900">Coach Master Access</h3>
+        <p class="text-xs text-slate-400 mt-0.5">Enter Coach PIN (Default: 1234)</p>
+      </div>
+
+      <div class="flex justify-center gap-2">
+        <input type="password" id="coachPinInput" maxlength="6" placeholder="PIN" class="w-32 text-center text-xl font-black tracking-widest bg-slate-50 border border-slate-300 rounded-xl py-2 focus:ring-2 focus:ring-golf-600 focus:outline-none">
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="closeCoachAuthModal()" class="flex-1 py-2.5 rounded-xl border border-slate-200 font-bold text-xs text-slate-600">Cancel</button>
+        <button onclick="verifyCoachPin()" class="flex-1 py-2.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs shadow">Unlock</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: GOOGLE SHEETS & CLOUD SYNC CONFIGURATION -->
+  <div id="syncModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-md w-full p-5 shadow-2xl border border-slate-200 space-y-4 my-auto">
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center font-black">
+            <i class="ph-bold ph-google-logo text-base"></i>
+          </div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">Cloud Sync & Google Sheets</h3>
+            <p class="text-xs text-slate-400">Sync rounds automatically to coach & player tabs</p>
+          </div>
+        </div>
+        <button onclick="closeSyncModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <div class="space-y-3 text-xs text-slate-600">
+        <div class="p-3 bg-golf-50/70 border border-golf-200 rounded-2xl">
+          <p class="font-bold text-golf-950 mb-1">⚡ Automatic Dual-Sync:</p>
+          <p class="text-[11px] leading-relaxed text-golf-900">
+            Whenever a player clicks <b>"Complete & Save Round"</b>, their stats are saved immediately to their private phone file, the Coach Master file, and asynchronously posted to your Google Sheet webhook!
+          </p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-700 uppercase tracking-wider text-[10px] mb-1">
+            Google Apps Script Webhook URL (Optional)
+          </label>
+          <input type="url" id="webhookUrlInput" placeholder="https://script.google.com/macros/s/.../exec" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-mono text-slate-800">
+          <p class="text-[10px] text-slate-400 mt-1">If blank, all rounds still sync instantly to local device files and exportable CSVs.</p>
+        </div>
+
+        <!-- Google Apps Script Helper Snippet -->
+        <details class="bg-slate-50 rounded-xl p-2.5 border border-slate-200">
+          <summary class="font-bold text-golf-800 cursor-pointer flex justify-between">
+            <span>📋 View Google Sheet Script Code</span>
+            <span class="text-[10px] text-slate-400">Click to view</span>
+          </summary>
+          <div class="mt-2 text-[10px] font-mono text-slate-700 bg-white p-2 rounded-lg border border-slate-200 overflow-x-auto max-h-36">
+<pre>function doPost(e) {
+  var data = JSON.parse(e.postData.contents);
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  
+  // 1. Log to Coach Master Tab
+  var master = ss.getSheetByName('Master_Log') || ss.insertSheet('Master_Log');
+  master.appendRow([new Date(), data.golferName, data.courseName, data.totalScore, data.scoreToPar, data.firPct + '%', data.girPct + '%', data.totalPutts, data.penalties, data.mentalMistakes]);
+  
+  // 2. Log to Individual Golfer Tab
+  var pSheet = ss.getSheetByName(data.golferName) || ss.insertSheet(data.golferName);
+  pSheet.appendRow([data.date, data.courseName, data.totalScore, data.scoreToPar, data.firPct + '%', data.girPct + '%', data.totalPutts]);
+  
+  return ContentService.createTextOutput(JSON.stringify({result: 'success'})).setMimeType(ContentService.MimeType.JSON);
+}</pre>
+          </div>
+        </details>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button onclick="testWebhookConnection()" class="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs">
+          Test Connection
+        </button>
+        <button onclick="saveSyncSettings()" class="flex-1 py-2.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs shadow">
+          Save Settings
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL: MANAGE COURSES -->
+  <div id="courseModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl max-w-lg w-full p-5 shadow-2xl border border-slate-200 my-auto space-y-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-base font-black text-slate-900">Tournament Golf Courses</h3>
+          <p class="text-xs text-slate-400">Configure course pars for automatic Par 3 detection</p>
+        </div>
+        <button onclick="closeCourseModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <!-- Add Custom Course -->
+      <details class="bg-slate-50 rounded-2xl p-3 border border-slate-200">
+        <summary class="font-bold text-xs text-golf-800 cursor-pointer flex items-center justify-between">
+          <span>➕ Add Custom Course with 18 Pars</span>
+          <span class="text-[10px] text-slate-400">Expand</span>
+        </summary>
+        <div class="mt-3 space-y-3 pt-3 border-t border-slate-200">
+          <div>
+            <label class="block text-[11px] font-bold text-slate-600 uppercase mb-1">Course Name</label>
+            <input type="text" id="newCourseName" placeholder="e.g., Eagle Valley Championship" class="w-full bg-white border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold">
+          </div>
+
+          <label class="block text-[11px] font-bold text-slate-600 uppercase">Set Par for all 18 Holes:</label>
+          <div class="grid grid-cols-6 gap-1 text-center" id="customCourseParsGrid">
+            <!-- 18 par selectors -->
+          </div>
+
+          <button onclick="saveCustomCourse()" class="w-full py-2.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs mt-2">
+            Save Course
+          </button>
+        </div>
+      </details>
+
+      <div class="space-y-2">
+        <h4 class="text-xs font-black text-slate-500 uppercase">Active Courses</h4>
+        <div id="courseListContainer" class="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <button onclick="closeCourseModal()" class="w-full py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs">
+        Done
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL: ADD GOLFER -->
+  <div id="addGolferModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl max-w-sm w-full p-5 shadow-2xl border border-slate-200 space-y-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-base font-black text-slate-900">Add Athlete to Roster</h3>
+        <button onclick="closeAddGolferModal()" class="w-8 h-8 rounded-full bg-slate-100 text-slate-500 flex items-center justify-center font-bold">
+          <i class="ph-bold ph-x"></i>
+        </button>
+      </div>
+
+      <form onsubmit="handleSaveNewGolfer(event)" class="space-y-3">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Golfer Full Name *</label>
+          <input type="text" id="newAthleteName" required placeholder="e.g., Alex Johnson" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-semibold">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Graduation Class / Year</label>
+          <input type="text" id="newAthleteGrad" placeholder="e.g., Class of 2027 (Junior)" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm">
+        </div>
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Private 4-Digit PIN (Optional)</label>
+          <input type="password" id="newAthletePin" maxlength="4" placeholder="e.g., 0000" class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3 py-2 text-sm font-mono">
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" onclick="closeAddGolferModal()" class="flex-1 py-2.5 rounded-xl border border-slate-300 text-slate-600 font-bold text-xs">Cancel</button>
+          <button type="submit" class="flex-1 py-2.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs shadow">Save Athlete</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- TOAST NOTIFICATION -->
+  <div id="toastNotification" class="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-slate-900 text-white text-xs font-bold px-4 py-2.5 rounded-2xl shadow-xl border border-slate-700 transition-all duration-300 opacity-0 pointer-events-none flex items-center gap-2">
+    <i class="ph-bold ph-check-circle text-emerald-400 text-base"></i>
+    <span id="toastMessage">Success</span>
+  </div>
+
+  <!-- ==================== LOGIC ENGINE ==================== -->
+  <script>
+    const STORAGE_KEY = 'eaglestats_golf_tracker_master_v2';
+    const COACH_DEFAULT_PIN = '1234';
+
+    // Default courses with exact 18 pars
+    const DEFAULT_COURSES = [
+      {
+        id: 'the-broadlands',
+        name: 'The Broadlands Golf Course',
+        pars: [4, 4, 3, 5, 4, 4, 3, 4, 5,  4, 5, 3, 4, 4, 4, 3, 5, 4],
+        parTotal: 72
+      },
+      {
+        id: 'flatirons',
+        name: 'Flatirons Golf Course',
+        pars: [4, 4, 3, 4, 5, 3, 4, 4, 4,  4, 3, 5, 4, 4, 3, 4, 5, 4],
+        parTotal: 71
+      },
+      {
+        id: 'championship-72',
+        name: 'Standard Championship 18',
+        pars: [4, 4, 5, 3, 4, 4, 3, 4, 5,  4, 4, 3, 5, 4, 4, 3, 5, 4],
+        parTotal: 72
+      }
+    ];
+
+    // Default Roster
+    const DEFAULT_ROSTER = [
+      { id: 'g_1', name: 'Will Davis', grad: 'Class of 2026', pin: '' },
+      { id: 'g_2', name: 'Tyler Reed', grad: 'Class of 2027', pin: '' },
+      { id: 'g_3', name: 'Mason Evans', grad: 'Class of 2026', pin: '' },
+      { id: 'g_4', name: 'Sammy Miller', grad: 'Class of 2028', pin: '' }
+    ];
+
+    // Application Global State
+    let appState = {
+      userRole: 'golfer', // 'golfer' | 'coach'
+      activeGolferId: null,
+      selectedCourseId: null,
+      currentHoleIndex: 0,
+      activeRound: null,
+      roster: [],
+      courses: [],
+      // Separated round files keyed by golfer ID: { [golferId]: [ ...rounds ] }
+      roundsByGolfer: {},
+      cloudWebhookUrl: '',
+      coachPin: COACH_DEFAULT_PIN
+    };
+
+    /**
+     * Initialization
+     */
+    window.addEventListener('DOMContentLoaded', () => {
+      loadState();
+      initializeDate();
+      renderCourseOptions();
+      ensureActiveGolfer();
+      initializeNewRoundIfNeeded();
+      renderHoleUI();
+      renderCustomCourseGrid();
+      renderCourseListInModal();
+      updateSyncStatusUI();
+    });
+
+    function loadState() {
+      try {
+        const saved = localStorage.getItem(STORAGE_KEY);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          appState.roster = parsed.roster || DEFAULT_ROSTER;
+          appState.courses = parsed.courses || DEFAULT_COURSES;
+          appState.roundsByGolfer = parsed.roundsByGolfer || {};
+          appState.activeGolferId = parsed.activeGolferId || (appState.roster[0]?.id || null);
+          appState.selectedCourseId = parsed.selectedCourseId || appState.courses[0].id;
+          appState.cloudWebhookUrl = parsed.cloudWebhookUrl || '';
+          appState.coachPin = parsed.coachPin || COACH_DEFAULT_PIN;
+          appState.userRole = parsed.userRole || 'golfer';
+        } else {
+          appState.roster = [...DEFAULT_ROSTER];
+          appState.courses = [...DEFAULT_COURSES];
+          appState.roundsByGolfer = {};
+          appState.activeGolferId = appState.roster[0]?.id || null;
+          appState.selectedCourseId = appState.courses[0].id;
+          saveState();
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    }
+
+    function saveState() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify({
+        roster: appState.roster,
+        courses: appState.courses,
+        roundsByGolfer: appState.roundsByGolfer,
+        activeGolferId: appState.activeGolferId,
+        selectedCourseId: appState.selectedCourseId,
+        cloudWebhookUrl: appState.cloudWebhookUrl,
+        coachPin: appState.coachPin,
+        userRole: appState.userRole
+      }));
+    }
+
+    function initializeDate() {
+      const today = new Date().toISOString().split('T')[0];
+      const el = document.getElementById('roundDateInput');
+      if (el && !el.value) el.value = today;
+    }
+
+    function ensureActiveGolfer() {
+      if (!appState.activeGolferId && appState.roster.length > 0) {
+        appState.activeGolferId = appState.roster[0].id;
+      }
+      updateHeaderUI();
+    }
+
+    function updateHeaderUI() {
+      const golfer = appState.roster.find(g => g.id === appState.activeGolferId);
+      const name = golfer ? golfer.name : 'Select Golfer';
+      document.getElementById('ribbonGolferName').textContent = name;
+      
+      const badge = document.getElementById('roleBadge');
+      const switchBtn = document.getElementById('switchRoleBtnText');
+      const privBadge = document.getElementById('ribbonPrivacyNotice');
+
+      if (appState.userRole === 'coach') {
+        badge.textContent = 'Coach Master';
+        badge.className = 'bg-gold-500 text-golf-950 font-black text-[9px] px-1.5 py-0.5 rounded uppercase tracking-wider';
+        switchBtn.textContent = 'Switch to Golfer';
+        privBadge.innerHTML = '<i class="ph-bold ph-eye text-emerald-400"></i> All Player Files Unlocked';
+        document.getElementById('subHeaderStatus').textContent = `Master View: ${name}`;
+      } else {
+        badge.textContent = 'Golfer';
+        badge.className = 'bg-emerald-950 text-emerald-300 border border-emerald-600/60 text-[9px] font-black px-1.5 py-0.5 rounded uppercase tracking-wider';
+        switchBtn.textContent = 'Coach Mode';
+        privBadge.innerHTML = '<i class="ph-bold ph-lock-key text-gold-400"></i> Private Stats File';
+        document.getElementById('subHeaderStatus').textContent = `Logged in as: ${name}`;
+      }
+    }
+
+    /**
+     * Role Verification (Coach vs Golfer)
+     */
+    function promptRoleSwitch() {
+      if (appState.userRole === 'coach') {
+        appState.userRole = 'golfer';
+        saveState();
+        updateHeaderUI();
+        switchTab('entry');
+        showToast('Switched to Golfer Private View');
+      } else {
+        document.getElementById('coachPinInput').value = '';
+        document.getElementById('coachAuthModal').classList.remove('hidden');
+        document.getElementById('coachPinInput').focus();
+      }
+    }
+
+    function closeCoachAuthModal() {
+      document.getElementById('coachAuthModal').classList.add('hidden');
+    }
+
+    function verifyCoachPin() {
+      const pin = document.getElementById('coachPinInput').value;
+      if (pin === appState.coachPin) {
+        appState.userRole = 'coach';
+        saveState();
+        closeCoachAuthModal();
+        updateHeaderUI();
+        switchTab('coach');
+        showToast('Coach Master Hub Unlocked');
+      } else {
+        showToast('Incorrect PIN. Default is 1234');
+      }
+    }
+
+    /**
+     * Golfer Switcher Modal
+     */
+    function openGolferSwitchModal() {
+      const list = document.getElementById('golferSwitchList');
+      list.innerHTML = '';
+
+      appState.roster.forEach(g => {
+        const isCurrent = g.id === appState.activeGolferId;
+        const btn = document.createElement('button');
+        btn.className = `w-full p-3 rounded-2xl border text-left flex items-center justify-between transition ${
+          isCurrent ? 'bg-golf-50 border-golf-600 font-black text-golf-950' : 'bg-white border-slate-200 hover:bg-slate-50'
+        }`;
+        btn.innerHTML = `
+          <div>
+            <span class="block text-xs font-bold text-slate-800">${g.name}</span>
+            <span class="text-[10px] text-slate-400">${g.grad || 'Team Athlete'}</span>
+          </div>
+          ${isCurrent ? '<i class="ph-bold ph-check text-golf-700"></i>' : ''}
+        `;
+        btn.onclick = () => selectGolferProfile(g.id);
+        list.appendChild(btn);
+      });
+
+      document.getElementById('golferSwitchModal').classList.remove('hidden');
+    }
+
+    function closeGolferSwitchModal() {
+      document.getElementById('golferSwitchModal').classList.add('hidden');
+    }
+
+    function selectGolferProfile(id) {
+      appState.activeGolferId = id;
+      saveState();
+      updateHeaderUI();
+      initializeNewRoundIfNeeded(true);
+      renderHoleUI();
+      renderGolferStatsDashboard();
+      closeGolferSwitchModal();
+      showToast(`Switched profile: ${getGolferName(id)}`);
+    }
+
+    function getGolferName(id) {
+      const g = appState.roster.find(x => x.id === id);
+      return g ? g.name : 'Unknown';
+    }
+
+    function getCurrentCourse() {
+      return appState.courses.find(c => c.id === appState.selectedCourseId) || appState.courses[0];
+    }
+
+    /**
+     * 18-Hole Scratchpad
+     */
+    function initializeNewRoundIfNeeded(forceReset = false) {
+      const course = getCurrentCourse();
+      const roundDate = document.getElementById('roundDateInput')?.value || new Date().toISOString().split('T')[0];
+
+      if (!appState.activeRound || forceReset || appState.activeRound.courseId !== course.id) {
+        const holes = [];
+        for (let i = 0; i < 18; i++) {
+          const par = course.pars[i] || 4;
+          holes.push({
+            holeNumber: i + 1,
+            par: par,
+            score: par,
+            isPar3: par === 3,
+            fairway: par === 3 ? 'na' : 'hit',
+            gir: true,
+            putts: 2,
+            penalties: 0,
+            mentalMistakes: [],
+            notes: ''
+          });
+        }
+
+        appState.activeRound = {
+          golferId: appState.activeGolferId,
+          courseId: course.id,
+          courseName: course.name,
+          date: roundDate,
+          holes: holes
+        };
+      }
+    }
+
+    function renderCourseOptions() {
+      const sel = document.getElementById('courseSelect');
+      sel.innerHTML = '';
+      appState.courses.forEach(c => {
+        const opt = document.createElement('option');
+        opt.value = c.id;
+        opt.textContent = `${c.name} (Par ${c.parTotal || 72})`;
+        if (c.id === appState.selectedCourseId) opt.selected = true;
+        sel.appendChild(opt);
+      });
+    }
+
+    function handleCourseChange() {
+      const sel = document.getElementById('courseSelect');
+      appState.selectedCourseId = sel.value;
+      saveState();
+
+      const course = getCurrentCourse();
+      if (appState.activeRound) {
+        appState.activeRound.courseId = course.id;
+        appState.activeRound.courseName = course.name;
+        appState.activeRound.holes.forEach((h, idx) => {
+          h.par = course.pars[idx] || 4;
+          h.isPar3 = (h.par === 3);
+          if (h.isPar3) h.fairway = 'na';
+        });
+      }
+      renderHoleUI();
+      showToast(`Course updated: ${course.name}`);
+    }
+
+    /**
+     * Hole Step Navigation & UI Sync
+     */
+    function navigateHole(delta) {
+      let nextHole = appState.currentHoleIndex + delta;
+      if (nextHole < 0) nextHole = 17;
+      if (nextHole > 17) nextHole = 0;
+      appState.currentHoleIndex = nextHole;
+      renderHoleUI();
+    }
+
+    function setHoleDirect(idx) {
+      appState.currentHoleIndex = idx;
+      renderHoleUI();
+    }
+
+    function renderHoleUI() {
+      if (!appState.activeRound) initializeNewRoundIfNeeded();
+      const hole = appState.activeRound.holes[appState.currentHoleIndex];
+      const par = hole.par;
+
+      document.getElementById('displayHoleNum').textContent = `Hole ${hole.holeNumber}`;
+      const parBadge = document.getElementById('displayHoleParBadge');
+      parBadge.textContent = `PAR ${par}`;
+      parBadge.className = (par === 3) 
+        ? 'bg-amber-100 text-amber-900 text-xs font-black px-2.5 py-1 rounded-full border border-amber-300'
+        : 'bg-golf-100 text-golf-800 text-xs font-black px-2.5 py-1 rounded-full border border-golf-300';
+
+      document.getElementById('currentScoreDisplay').textContent = hole.score;
+      const rel = document.getElementById('scoreRelationDisplay');
+      const diff = hole.score - par;
+      if (diff === 0) { rel.textContent = 'Par (E)'; rel.className = 'block text-[10px] font-bold text-slate-500'; }
+      else if (diff === -1) { rel.textContent = 'Birdie (-1)'; rel.className = 'block text-[10px] font-bold text-emerald-600'; }
+      else if (diff <= -2) { rel.textContent = 'Eagle (-2)'; rel.className = 'block text-[10px] font-bold text-emerald-700 font-black'; }
+      else if (diff === 1) { rel.textContent = 'Bogey (+1)'; rel.className = 'block text-[10px] font-bold text-amber-600'; }
+      else { rel.textContent = `+${diff} Over`; rel.className = 'block text-[10px] font-bold text-rose-600 font-black'; }
+
+      // Fairway logic (Disabled on Par 3)
+      const fwGrid = document.getElementById('fairwayButtonsGrid');
+      const fwNotice = document.getElementById('par3DisabledNotice');
+      const fwBadge = document.getElementById('par3FairwayBadge');
+
+      if (par === 3) {
+        fwGrid.classList.add('hidden');
+        fwNotice.classList.remove('hidden');
+        fwBadge.classList.remove('hidden');
+        hole.fairway = 'na';
+      } else {
+        fwGrid.classList.remove('hidden');
+        fwNotice.classList.add('hidden');
+        fwBadge.classList.add('hidden');
+
+        ['left', 'hit', 'right'].forEach(t => {
+          const btn = document.getElementById(`btnFairway${capitalize(t)}`);
+          if (hole.fairway === t) {
+            btn.className = 'fairway-btn py-3 px-2 rounded-xl border-2 border-emerald-600 bg-emerald-50 font-black text-xs text-emerald-900 shadow-sm flex flex-col items-center gap-1';
+          } else {
+            btn.className = 'fairway-btn py-3 px-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex flex-col items-center gap-1';
+          }
+        });
+      }
+
+      // GIR
+      const btnGYes = document.getElementById('btnGirYes');
+      const btnGNo = document.getElementById('btnGirNo');
+      if (hole.gir) {
+        btnGYes.className = 'gir-btn py-3 px-3 rounded-xl border-2 border-blue-600 bg-blue-50 font-black text-xs text-blue-900 shadow-sm flex items-center justify-center gap-2';
+        btnGNo.className = 'gir-btn py-3 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex items-center justify-center gap-2';
+      } else {
+        btnGYes.className = 'gir-btn py-3 px-3 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95 flex items-center justify-center gap-2';
+        btnGNo.className = 'gir-btn py-3 px-3 rounded-xl border-2 border-rose-500 bg-rose-50 font-black text-xs text-rose-900 shadow-sm flex items-center justify-center gap-2';
+      }
+
+      // Putts
+      [0, 1, 2, 3, 4].forEach(p => {
+        const btn = document.getElementById(`putt${p}`);
+        const match = (p === 4) ? (hole.putts >= 4) : (hole.putts === p);
+        btn.className = match
+          ? 'putt-btn py-2.5 rounded-xl border-2 border-golf-700 bg-golf-50 font-black text-sm text-golf-950 shadow-sm'
+          : 'putt-btn py-2.5 rounded-xl border border-slate-200 bg-white font-black text-sm text-slate-700 active:scale-95';
+      });
+      document.getElementById('puttIndicatorText').textContent = `${hole.putts} Putt${hole.putts === 1 ? '' : 's'}`;
+
+      // Penalties
+      [0, 1, 2, 3].forEach(pen => {
+        const btn = document.getElementById(`pen${pen}`);
+        const match = (pen === 3) ? (hole.penalties >= 3) : (hole.penalties === pen);
+        btn.className = match
+          ? ((pen > 0) ? 'pen-btn py-2 rounded-xl border-2 border-rose-600 bg-rose-50 font-black text-xs text-rose-900 shadow-sm' : 'pen-btn py-2 rounded-xl border-2 border-slate-700 bg-slate-100 font-black text-xs text-slate-900 shadow-sm')
+          : 'pen-btn py-2 rounded-xl border border-slate-200 bg-white font-bold text-xs text-slate-700 active:scale-95';
+      });
+
+      // Mental tags & Notes
+      renderMentalMistakesSelection(hole.mentalMistakes || []);
+      document.getElementById('holeNotesInput').value = hole.notes || '';
+
+      renderHolePills();
+      updateLiveSummaryBanner();
+      renderScorecardGrid();
+    }
+
+    function renderHolePills() {
+      const c = document.getElementById('holePillsContainer');
+      c.innerHTML = '';
+      appState.activeRound.holes.forEach((h, idx) => {
+        const isCur = idx === appState.currentHoleIndex;
+        const diff = h.score - h.par;
+        let color = 'bg-slate-100 text-slate-700 border-slate-200';
+        if (diff < 0) color = 'bg-emerald-100 text-emerald-900 border-emerald-300 font-black';
+        else if (diff > 0) color = 'bg-rose-100 text-rose-900 border-rose-300 font-bold';
+
+        const btn = document.createElement('button');
+        btn.className = `w-10 py-1 rounded-xl text-xs flex flex-col items-center justify-center shrink-0 border transition ${
+          isCur ? 'ring-2 ring-golf-600 font-black shadow-md ' + color : color
+        }`;
+        btn.innerHTML = `<span class="text-[9px] uppercase font-bold text-slate-400">#${h.holeNumber}</span><span class="text-xs font-black">${h.score}</span>`;
+        btn.onclick = () => setHoleDirect(idx);
+        c.appendChild(btn);
+      });
+    }
+
+    function adjustScore(d) {
+      const h = appState.activeRound.holes[appState.currentHoleIndex];
+      h.score = Math.max(1, h.score + d);
+      renderHoleUI();
+    }
+
+    function setFairway(val) {
+      const h = appState.activeRound.holes[appState.currentHoleIndex];
+      if (h.isPar3) return;
+      h.fairway = val;
+      renderHoleUI();
+    }
+
+    function setGir(val) {
+      appState.activeRound.holes[appState.currentHoleIndex].gir = val;
+      renderHoleUI();
+    }
+
+    function setPutts(val) {
+      appState.activeRound.holes[appState.currentHoleIndex].putts = val;
+      renderHoleUI();
+    }
+
+    function setPenalties(val) {
+      appState.activeRound.holes[appState.currentHoleIndex].penalties = val;
+      renderHoleUI();
+    }
+
+    function toggleMentalTag(name) {
+      const h = appState.activeRound.holes[appState.currentHoleIndex];
+      if (!h.mentalMistakes) h.mentalMistakes = [];
+      const idx = h.mentalMistakes.indexOf(name);
+      if (idx > -1) h.mentalMistakes.splice(idx, 1);
+      else h.mentalMistakes.push(name);
+      renderHoleUI();
+    }
+
+    function renderMentalMistakesSelection(selected) {
+      document.getElementById('mentalCountBadge').textContent = `${selected.length} Tagged`;
+      document.querySelectorAll('.mental-tag-btn').forEach(btn => {
+        const text = btn.textContent.trim();
+        const found = selected.some(s => text.includes(s));
+        btn.className = found
+          ? 'mental-tag-btn text-left p-2 rounded-xl border-2 border-amber-500 bg-amber-100 text-[11px] font-bold text-amber-950 flex items-center gap-1.5 shadow-sm'
+          : 'mental-tag-btn text-left p-2 rounded-xl border border-amber-200 bg-white text-[11px] font-semibold text-slate-700 flex items-center gap-1.5 transition';
+      });
+    }
+
+    function saveHoleNotes(val) {
+      appState.activeRound.holes[appState.currentHoleIndex].notes = val;
+    }
+
+    function calculateRoundSummary(holes) {
+      let score = 0, parTot = 0, fwHits = 0, fwEligible = 0, girHits = 0, putts = 0, pens = 0, mental = 0;
+      holes.forEach(h => {
+        score += (h.score || 0);
+        parTot += (h.par || 4);
+        if (!h.isPar3 && h.fairway !== 'na') {
+          fwEligible++;
+          if (h.fairway === 'hit') fwHits++;
+        }
+        if (h.gir) girHits++;
+        putts += (h.putts || 0);
+        pens += (h.penalties || 0);
+        if (h.mentalMistakes) mental += h.mentalMistakes.length;
+      });
+
+      return {
+        totalScore: score,
+        parTotal: parTot,
+        scoreToPar: score - parTot,
+        fairwaysHit: fwHits,
+        fairwayHoles: fwEligible,
+        firPct: fwEligible > 0 ? Math.round((fwHits / fwEligible) * 100) : 0,
+        girHit: girHits,
+        girPct: Math.round((girHits / 18) * 100),
+        totalPutts: putts,
+        avgPutts: (putts / 18).toFixed(1),
+        penalties: pens,
+        mentalMistakes: mental
+      };
+    }
+
+    function updateLiveSummaryBanner() {
+      const summary = calculateRoundSummary(appState.activeRound.holes);
+      document.getElementById('liveTotalScore').textContent = summary.totalScore;
+      const toPar = document.getElementById('liveScoreToPar');
+      if (summary.scoreToPar === 0) { toPar.textContent = 'Even (E)'; toPar.className = 'text-[10px] font-bold text-slate-500 block'; }
+      else if (summary.scoreToPar < 0) { toPar.textContent = `${summary.scoreToPar} Under`; toPar.className = 'text-[10px] font-bold text-emerald-600 block'; }
+      else { toPar.textContent = `+${summary.scoreToPar} Over`; toPar.className = 'text-[10px] font-bold text-rose-600 block'; }
+
+      document.getElementById('liveThruHoles').textContent = '18';
+      document.getElementById('liveFairwayStat').textContent = `${summary.fairwaysHit}/${summary.fairwayHoles}`;
+      document.getElementById('liveFairwayPct').textContent = `${summary.firPct}%`;
+      document.getElementById('liveGirStat').textContent = `${summary.girHit}/18`;
+      document.getElementById('liveGirPct').textContent = `${summary.girPct}%`;
+      document.getElementById('liveTotalPutts').textContent = summary.totalPutts;
+      document.getElementById('liveAvgPutts').textContent = `${summary.avgPutts}/h`;
+      document.getElementById('liveTotalPenalties').textContent = summary.penalties;
+      document.getElementById('liveMentalCount').textContent = `${summary.mentalMistakes} Mental`;
+    }
+
+    function toggleCardOrHoleView() {
+      const grid = document.getElementById('fullScorecardSection');
+      grid.classList.toggle('hidden');
+    }
+
+    function renderScorecardGrid() {
+      const tb = document.getElementById('scorecardTableBody');
+      if (!tb || !appState.activeRound) return;
+      const holes = appState.activeRound.holes;
+      const f9 = holes.slice(0, 9);
+      const b9 = holes.slice(9, 18);
+
+      const fScore = f9.reduce((a, c) => a + c.score, 0);
+      const bScore = b9.reduce((a, c) => a + c.score, 0);
+      const fPar = f9.reduce((a, c) => a + c.par, 0);
+      const bPar = b9.reduce((a, c) => a + c.par, 0);
+
+      tb.innerHTML = `
+        <tr class="bg-slate-50 text-slate-500 font-semibold">
+          <td class="p-2 text-left font-bold text-slate-700">Par</td>
+          ${f9.map(h => `<td class="p-1">${h.par}</td>`).join('')}
+          <td class="p-1 bg-slate-200 text-slate-900 font-bold">${fPar}</td>
+          ${b9.map(h => `<td class="p-1">${h.par}</td>`).join('')}
+          <td class="p-1 bg-slate-200 text-slate-900 font-bold">${bPar}</td>
+          <td class="p-1 bg-golf-800 text-white font-black">${fPar + bPar}</td>
+        </tr>
+        <tr class="font-black text-slate-900">
+          <td class="p-2 text-left">Score</td>
+          ${f9.map((h, i) => `<td onclick="setHoleDirect(${i})" class="p-1 cursor-pointer hover:bg-slate-100">${h.score}</td>`).join('')}
+          <td class="p-1 bg-slate-200">${fScore}</td>
+          ${b9.map((h, i) => `<td onclick="setHoleDirect(${i+9})" class="p-1 cursor-pointer hover:bg-slate-100">${h.score}</td>`).join('')}
+          <td class="p-1 bg-slate-200">${bScore}</td>
+          <td class="p-1 bg-golf-900 text-gold-400 font-black">${fScore + bScore}</td>
+        </tr>
+      `;
+    }
+
+    /**
+     * Complete & Dual-Sync Round (Saved to Player File + Coach File + Cloud Webhook)
+     */
+    async function confirmAndFinishRound() {
+      const golferId = appState.activeGolferId;
+      const golferName = getGolferName(golferId);
+      const course = getCurrentCourse();
+      const summary = calculateRoundSummary(appState.activeRound.holes);
+      const roundDate = document.getElementById('roundDateInput').value || new Date().toISOString().split('T')[0];
+
+      const completedRound = {
+        roundId: 'rnd_' + Date.now(),
+        date: roundDate,
+        golferId: golferId,
+        golferName: golferName,
+        courseId: course.id,
+        courseName: course.name,
+        parTotal: course.parTotal || 72,
+        totals: summary,
+        holes: JSON.parse(JSON.stringify(appState.activeRound.holes))
+      };
+
+      // 1. Save to Isolated Golfer File
+      if (!appState.roundsByGolfer[golferId]) {
+        appState.roundsByGolfer[golferId] = [];
+      }
+      appState.roundsByGolfer[golferId].unshift(completedRound);
+      saveState();
+
+      // 2. Asynchronously Sync to Google Sheets / Cloud Webhook if configured
+      if (appState.cloudWebhookUrl) {
+        showToast('Syncing round to Cloud & Google Sheets...');
+        try {
+          await fetch(appState.cloudWebhookUrl, {
+            method: 'POST',
+            mode: 'no-cors',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              timestamp: new Date().toISOString(),
+              golferId: golferId,
+              golferName: golferName,
+              date: roundDate,
+              courseName: course.name,
+              totalScore: summary.totalScore,
+              scoreToPar: summary.scoreToPar,
+              firPct: summary.firPct,
+              girPct: summary.girPct,
+              totalPutts: summary.totalPutts,
+              penalties: summary.penalties,
+              mentalMistakes: summary.mentalMistakes,
+              holes: completedRound.holes
+            })
+          });
+        } catch (err) {
+          console.warn('Background sync failed:', err);
+        }
+      }
+
+      showToast(`Round saved for ${golferName} (Score: ${summary.totalScore})!`);
+      renderGolferStatsDashboard();
+      renderCoachMasterHub();
+      switchTab('stats');
+    }
+
+    function startFreshRoundForGolfer() {
+      initializeNewRoundIfNeeded(true);
+      appState.currentHoleIndex = 0;
+      renderHoleUI();
+      switchTab('entry');
+      showToast('Started fresh tournament scorecard');
+    }
+
+    /**
+     * Golfer Stats Dashboard (Individual Player File)
+     */
+    function renderGolferStatsDashboard() {
+      const golferId = appState.activeGolferId;
+      const golfer = appState.roster.find(g => g.id === golferId);
+      if (!golfer) return;
+
+      document.getElementById('statsGolferName').textContent = golfer.name;
+      document.getElementById('statsPlayerGrad').textContent = golfer.grad || 'Broomfield High Golf';
+
+      const rounds = appState.roundsByGolfer[golferId] || [];
+      document.getElementById('statsRoundsCount').textContent = `${rounds.length} Tournament Round${rounds.length === 1 ? '' : 's'} Tracked`;
+      document.getElementById('roundHistoryCount').textContent = `${rounds.length} saved rounds`;
+
+      if (rounds.length === 0) {
+        document.getElementById('aggAvgScore').textContent = '--';
+        document.getElementById('aggScoreToPar').textContent = '-- to par';
+        document.getElementById('aggFirPct').textContent = '--%';
+        document.getElementById('aggFirRatio').textContent = 'No rounds yet';
+        document.getElementById('aggGirPct').textContent = '--%';
+        document.getElementById('aggGirRatio').textContent = 'No rounds yet';
+        document.getElementById('aggAvgPutts').textContent = '--';
+        document.getElementById('aggPuttsPerHole').textContent = '--/h';
+        document.getElementById('aggMentalPerRound').textContent = '0 / round';
+        document.getElementById('aggScramblingPct').textContent = '--%';
+        document.getElementById('aggPenaltiesPerRound').textContent = '--';
+        document.getElementById('mentalMistakesList').innerHTML = `<p class="text-xs text-slate-400 italic">Log tournament rounds to calculate mental error frequencies.</p>`;
+        document.getElementById('roundsListContainer').innerHTML = `
+          <div class="text-center py-6 text-slate-400">
+            <i class="ph-bold ph-golf text-3xl mb-1 text-slate-300"></i>
+            <p class="text-xs font-semibold">No saved tournament rounds for ${golfer.name}.</p>
+          </div>
+        `;
+        return;
+      }
+
+      let scores = 0, pars = 0, fwHit = 0, fwElig = 0, girHit = 0, putts = 0, pens = 0, mental = 0;
+      let missedGir = 0, scrambles = 0;
+      const mentalCounts = {};
+
+      rounds.forEach(r => {
+        scores += r.totals.totalScore;
+        pars += r.totals.parTotal;
+        fwHit += r.totals.fairwaysHit;
+        fwElig += r.totals.fairwayHoles;
+        girHit += r.totals.girHit;
+        putts += r.totals.totalPutts;
+        pens += r.totals.penalties;
+        mental += r.totals.mentalMistakes;
+
+        r.holes.forEach(h => {
+          if (!h.gir) {
+            missedGir++;
+            if (h.score <= h.par) scrambles++;
+          }
+          if (h.mentalMistakes) {
+            h.mentalMistakes.forEach(m => {
+              mentalCounts[m] = (mentalCounts[m] || 0) + 1;
+            });
+          }
+        });
+      });
+
+      const avgScore = (scores / rounds.length).toFixed(1);
+      const toParAvg = ((scores - pars) / rounds.length).toFixed(1);
+      const firPct = fwElig > 0 ? Math.round((fwHit / fwElig) * 100) : 0;
+      const girPct = Math.round((girHit / (rounds.length * 18)) * 100);
+      const puttsPerHole = (putts / (rounds.length * 18)).toFixed(2);
+      const scramblePct = missedGir > 0 ? Math.round((scrambles / missedGir) * 100) : 0;
+
+      document.getElementById('aggAvgScore').textContent = avgScore;
+      document.getElementById('aggScoreToPar').textContent = `${toParAvg > 0 ? '+' : ''}${toParAvg} to par`;
+      document.getElementById('aggFirPct').textContent = `${firPct}%`;
+      document.getElementById('aggFirRatio').textContent = `${fwHit}/${fwElig} Fairways`;
+      document.getElementById('aggGirPct').textContent = `${girPct}%`;
+      document.getElementById('aggGirRatio').textContent = `${girHit}/${rounds.length * 18} Greens`;
+      document.getElementById('aggAvgPutts').textContent = (putts / rounds.length).toFixed(1);
+      document.getElementById('aggPuttsPerHole').textContent = `${puttsPerHole} / hole`;
+      document.getElementById('aggMentalPerRound').textContent = `${(mental / rounds.length).toFixed(1)} / round`;
+      document.getElementById('aggScramblingPct').textContent = `${scramblePct}%`;
+      document.getElementById('aggPenaltiesPerRound').textContent = (pens / rounds.length).toFixed(1);
+
+      // Render Mental Bars
+      const tags = ['Rushed Routine', 'Wrong Aim / Target', 'Wrong Club', 'Anger / Emotion', 'Lapse in Focus', 'Hero Shot Attempt'];
+      const mList = document.getElementById('mentalMistakesList');
+      mList.innerHTML = tags.map(t => {
+        const c = mentalCounts[t] || 0;
+        const p = mental > 0 ? Math.round((c / mental) * 100) : 0;
+        return `
+          <div>
+            <div class="flex justify-between text-[11px] font-semibold text-slate-700 mb-0.5">
+              <span>${t}</span>
+              <span class="text-slate-500 font-bold">${c} (${p}%)</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-1.5 overflow-hidden border border-slate-200">
+              <div class="bg-amber-500 h-1.5 rounded-full" style="width: ${p}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Render Rounds History Cards
+      const container = document.getElementById('roundsListContainer');
+      container.innerHTML = '';
+      rounds.forEach(r => {
+        const div = document.createElement('div');
+        div.className = 'bg-slate-50 rounded-2xl p-3 border border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-2';
+        const toParBadge = r.totals.scoreToPar <= 0 
+          ? `<span class="text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-300">${r.totals.scoreToPar}</span>`
+          : `<span class="text-xs font-bold text-rose-700 bg-rose-50 px-2 py-0.5 rounded border border-rose-300">+${r.totals.scoreToPar}</span>`;
+
+        div.innerHTML = `
+          <div>
+            <div class="flex items-center gap-2 mb-1">
+              <span class="text-xs font-black text-slate-900">${r.courseName}</span>
+              ${toParBadge}
+            </div>
+            <div class="flex flex-wrap items-center gap-x-2.5 text-[11px] text-slate-500">
+              <span><i class="ph-bold ph-calendar"></i> ${r.date}</span>
+              <span>•</span>
+              <span class="text-emerald-700 font-semibold">FIR: ${r.totals.firPct}%</span>
+              <span>•</span>
+              <span class="text-blue-700 font-semibold">GIR: ${r.totals.girPct}%</span>
+              <span>•</span>
+              <span class="text-slate-700 font-semibold">Putts: ${r.totals.totalPutts}</span>
+            </div>
+          </div>
+          <div class="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-t-0 pt-1.5 sm:pt-0 border-slate-200">
+            <span class="text-xl font-black text-slate-800">${r.totals.totalScore}</span>
+            <button onclick="deleteRound('${r.roundId}')" class="text-slate-400 hover:text-rose-600 p-1" title="Delete">
+              <i class="ph-bold ph-trash"></i>
+            </button>
+          </div>
+        `;
+        container.appendChild(div);
+      });
+    }
+
+    function deleteRound(roundId) {
+      if (!confirm('Are you sure you want to delete this tournament round?')) return;
+      appState.roundsByGolfer[appState.activeGolferId] = (appState.roundsByGolfer[appState.activeGolferId] || []).filter(r => r.roundId !== roundId);
+      saveState();
+      renderGolferStatsDashboard();
+      renderCoachMasterHub();
+      showToast('Tournament round removed.');
+    }
+
+    /**
+     * Coach Command Center (Master View)
+     */
+    function renderCoachMasterHub() {
+      // 1. Roster Cards
+      const rGrid = document.getElementById('coachRosterGrid');
+      rGrid.innerHTML = '';
+      appState.roster.forEach(g => {
+        const rounds = appState.roundsByGolfer[g.id] || [];
+        let avg = '--';
+        if (rounds.length > 0) {
+          const sum = rounds.reduce((a, c) => a + c.totals.totalScore, 0);
+          avg = (sum / rounds.length).toFixed(1);
+        }
+
+        const div = document.createElement('div');
+        div.className = 'p-3.5 rounded-2xl border border-slate-200 bg-slate-50 hover:bg-slate-100 flex items-center justify-between transition';
+        div.innerHTML = `
+          <div>
+            <h4 class="text-xs font-black text-slate-900">${g.name}</h4>
+            <span class="text-[10px] text-slate-500">${rounds.length} Rounds • Avg: ${avg}</span>
+          </div>
+          <button onclick="coachOpenPlayerFile('${g.id}')" class="px-3 py-1.5 rounded-xl bg-golf-700 hover:bg-golf-800 text-white font-bold text-xs flex items-center gap-1 shadow-sm">
+            <i class="ph-bold ph-folder-open"></i> Open File
+          </button>
+        `;
+        rGrid.appendChild(div);
+      });
+
+      // 2. Leaderboard Table
+      const mb = document.getElementById('masterLeaderboardBody');
+      mb.innerHTML = '';
+
+      const leaderboard = appState.roster.map(g => {
+        const rounds = appState.roundsByGolfer[g.id] || [];
+        if (rounds.length === 0) {
+          return { id: g.id, name: g.name, rounds: 0, avg: 999, fir: 0, gir: 0, putts: 0, mental: 0 };
+        }
+        let totScore = 0, totFir = 0, totFirElig = 0, totGir = 0, totPutts = 0, totMental = 0;
+        rounds.forEach(r => {
+          totScore += r.totals.totalScore;
+          totFir += r.totals.fairwaysHit;
+          totFirElig += r.totals.fairwayHoles;
+          totGir += r.totals.girHit;
+          totPutts += r.totals.totalPutts;
+          totMental += r.totals.mentalMistakes;
+        });
+
+        return {
+          id: g.id,
+          name: g.name,
+          rounds: rounds.length,
+          avg: Number((totScore / rounds.length).toFixed(1)),
+          fir: totFirElig > 0 ? Math.round((totFir / totFirElig) * 100) : 0,
+          gir: Math.round((totGir / (rounds.length * 18)) * 100),
+          putts: Number((totPutts / rounds.length).toFixed(1)),
+          mental: Number((totMental / rounds.length).toFixed(1))
+        };
+      });
+
+      leaderboard.sort((a, b) => a.avg - b.avg);
+
+      leaderboard.forEach((item, idx) => {
+        const tr = document.createElement('tr');
+        tr.className = 'hover:bg-slate-50 transition';
+        tr.innerHTML = `
+          <td class="p-3 font-bold text-slate-900 flex items-center gap-2">
+            <span class="w-4 text-slate-400 font-black text-xs">${idx + 1}</span>
+            <span>${item.name}</span>
+          </td>
+          <td class="p-3 text-center text-slate-600 font-semibold">${item.rounds}</td>
+          <td class="p-3 text-center font-black ${item.avg === 999 ? 'text-slate-400' : 'text-slate-900'}">${item.avg === 999 ? '--' : item.avg}</td>
+          <td class="p-3 text-center text-emerald-700 font-semibold">${item.rounds > 0 ? item.fir + '%' : '--'}</td>
+          <td class="p-3 text-center text-blue-700 font-semibold">${item.rounds > 0 ? item.gir + '%' : '--'}</td>
+          <td class="p-3 text-center text-slate-700 font-semibold">${item.rounds > 0 ? item.putts : '--'}</td>
+          <td class="p-3 text-center text-amber-700 font-semibold">${item.rounds > 0 ? item.mental : '--'}</td>
+          <td class="p-3 text-right">
+            <button onclick="coachOpenPlayerFile('${item.id}')" class="text-xs bg-slate-100 hover:bg-golf-700 hover:text-white px-2 py-1 rounded-lg font-bold transition">
+              View File
+            </button>
+          </td>
+        `;
+        mb.appendChild(tr);
+      });
+    }
+
+    function coachOpenPlayerFile(golferId) {
+      appState.activeGolferId = golferId;
+      saveState();
+      updateHeaderUI();
+      renderGolferStatsDashboard();
+      switchTab('stats');
+      showToast(`Viewing ${getGolferName(golferId)}'s file`);
+    }
+
+    /**
+     * Cloud Sync Configuration
+     */
+    function updateSyncStatusUI() {
+      const dot = document.getElementById('cloudStatusDot');
+      const text = document.getElementById('cloudStatusText');
+      const coachBadge = document.getElementById('coachWebhookStatusBadge');
+
+      if (appState.cloudWebhookUrl) {
+        dot.className = 'w-2 h-2 rounded-full bg-emerald-400';
+        text.textContent = 'Cloud Synced';
+        coachBadge.className = 'bg-emerald-900/60 text-emerald-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-emerald-700/50';
+        coachBadge.textContent = 'Connected (Google Sheets)';
+      } else {
+        dot.className = 'w-2 h-2 rounded-full bg-amber-400';
+        text.textContent = 'Local File Only';
+        coachBadge.className = 'bg-amber-900/60 text-amber-300 text-[10px] font-bold px-2 py-0.5 rounded-full border border-amber-700/50';
+        coachBadge.textContent = 'Not Connected';
+      }
+    }
+
+    function openSyncModal() {
+      document.getElementById('webhookUrlInput').value = appState.cloudWebhookUrl || '';
+      document.getElementById('syncModal').classList.remove('hidden');
+    }
+
+    function closeSyncModal() {
+      document.getElementById('syncModal').classList.add('hidden');
+    }
+
+    function saveSyncSettings() {
+      appState.cloudWebhookUrl = document.getElementById('webhookUrlInput').value.trim();
+      saveState();
+      updateSyncStatusUI();
+      closeSyncModal();
+      showToast('Cloud Sync settings saved.');
+    }
+
+    async function testWebhookConnection() {
+      const url = document.getElementById('webhookUrlInput').value.trim();
+      if (!url) {
+        showToast('Please enter a Google Apps Script Webhook URL');
+        return;
+      }
+      showToast('Sending test ping to Google Sheets...');
+      try {
+        await fetch(url, {
+          method: 'POST',
+          mode: 'no-cors',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ testPing: true, message: 'Ping from EagleStats Golf' })
+        });
+        showToast('Ping sent! Check your Google Sheet tab.');
+      } catch (err) {
+        showToast('Connection error. Verify script deployment.');
+      }
+    }
+
+    /**
+     * CSV Exporters
+     */
+    function exportActiveGolferCSV() {
+      const g = appState.roster.find(x => x.id === appState.activeGolferId);
+      const rounds = appState.roundsByGolfer[appState.activeGolferId] || [];
+
+      if (rounds.length === 0) {
+        showToast(`No rounds logged yet for ${g.name}`);
+        return;
+      }
+
+      let csv = `EagleStats Tournament Player File - ${g.name}\n`;
+      csv += `Golfer,${g.name},Class,${g.grad || ''}\n\n`;
+      csv += `Date,Course,Hole,Par,Score,FIR,GIR,Putts,Penalties,Mental Mistakes,Notes\n`;
+
+      rounds.forEach(r => {
+        r.holes.forEach(h => {
+          const fw = h.isPar3 ? 'N/A (Par 3)' : (h.fairway === 'hit' ? 'Hit' : (h.fairway === 'left' ? 'Missed Left' : 'Missed Right'));
+          const gir = h.gir ? 'Yes' : 'No';
+          const mental = (h.mentalMistakes || []).join('; ');
+          const notes = `"${(h.notes || '').replace(/"/g, '""')}"`;
+          csv += `${r.date},"${r.courseName}",${h.holeNumber},${h.par},${h.score},${fw},${gir},${h.putts},${h.penalties},"${mental}",${notes}\n`;
+        });
+      });
+
+      downloadFile(`${g.name.replace(/\s+/g, '_')}_Golf_Stats.csv`, csv, 'text/csv');
+      showToast(`Exported CSV for ${g.name}`);
+    }
+
+    function exportMasterTeamCSV() {
+      let csv = `EagleStats Master Team Tournament Summary\n`;
+      csv += `Export Date,${new Date().toLocaleDateString()}\n\n`;
+      csv += `Golfer,Grad Class,Rounds Tracked,Scoring Average,FIR %,GIR %,Putts/Round,Mental Mistakes/Round\n`;
+
+      appState.roster.forEach(g => {
+        const rounds = appState.roundsByGolfer[g.id] || [];
+        if (rounds.length === 0) {
+          csv += `"${g.name}","${g.grad || ''}",0,N/A,N/A,N/A,N/A,N/A\n`;
+          return;
+        }
+        let score = 0, fir = 0, firElig = 0, gir = 0, putts = 0, mental = 0;
+        rounds.forEach(r => {
+          score += r.totals.totalScore;
+          fir += r.totals.fairwaysHit;
+          firElig += r.totals.fairwayHoles;
+          gir += r.totals.girHit;
+          putts += r.totals.totalPutts;
+          mental += r.totals.mentalMistakes;
+        });
+
+        const avgScore = (score / rounds.length).toFixed(1);
+        const firPct = firElig > 0 ? `${Math.round((fir / firElig) * 100)}%` : '0%';
+        const girPct = `${Math.round((gir / (rounds.length * 18)) * 100)}%`;
+        const avgPutts = (putts / rounds.length).toFixed(1);
+        const avgMental = (mental / rounds.length).toFixed(1);
+
+        csv += `"${g.name}","${g.grad || ''}",${rounds.length},${avgScore},${firPct},${girPct},${avgPutts},${avgMental}\n`;
+      });
+
+      downloadFile(`Team_Tournament_Master_File.csv`, csv, 'text/csv');
+      showToast('Master Team CSV exported.');
+    }
+
+    function downloadFile(filename, text, mime) {
+      const a = document.createElement('a');
+      a.href = `data:${mime};charset=utf-8,` + encodeURIComponent(text);
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    }
+
+    /**
+     * Add Golfer Modal Handlers
+     */
+    function openAddGolferModal() {
+      document.getElementById('newAthleteName').value = '';
+      document.getElementById('newAthleteGrad').value = '';
+      document.getElementById('newAthletePin').value = '';
+      document.getElementById('addGolferModal').classList.remove('hidden');
+    }
+
+    function closeAddGolferModal() {
+      document.getElementById('addGolferModal').classList.add('hidden');
+    }
+
+    function handleSaveNewGolfer(e) {
+      e.preventDefault();
+      const name = document.getElementById('newAthleteName').value.trim();
+      const grad = document.getElementById('newAthleteGrad').value.trim();
+      const pin = document.getElementById('newAthletePin').value.trim();
+
+      if (!name) return;
+
+      const newGolfer = {
+        id: 'g_' + Date.now(),
+        name,
+        grad,
+        pin
+      };
+
+      appState.roster.push(newGolfer);
+      saveState();
+      closeAddGolferModal();
+      renderCoachMasterHub();
+      showToast(`Added ${name} to roster.`);
+    }
+
+    /**
+     * Course Management
+     */
+    function renderCustomCourseGrid() {
+      const g = document.getElementById('customCourseParsGrid');
+      g.innerHTML = '';
+      for (let i = 1; i <= 18; i++) {
+        const div = document.createElement('div');
+        div.className = 'flex flex-col items-center bg-white p-1 rounded-lg border border-slate-200';
+        div.innerHTML = `
+          <span class="text-[9px] font-bold text-slate-400">#${i}</span>
+          <select id="parHole${i}" class="text-xs font-black text-slate-800 bg-transparent focus:outline-none">
+            <option value="3">3</option>
+            <option value="4" selected>4</option>
+            <option value="5">5</option>
+          </select>
+        `;
+        g.appendChild(div);
+      }
+    }
+
+    function renderCourseListInModal() {
+      const l = document.getElementById('courseListContainer');
+      l.innerHTML = '';
+      appState.courses.forEach(c => {
+        const item = document.createElement('div');
+        item.className = 'p-2 rounded-xl border border-slate-200 bg-slate-50 flex items-center justify-between text-xs';
+        item.innerHTML = `
+          <div>
+            <span class="font-bold text-slate-800">${c.name}</span>
+            <span class="text-slate-400 block text-[10px]">Par ${c.parTotal || 72} • 18 Holes</span>
+          </div>
+          <span class="text-[10px] font-semibold bg-white border border-slate-200 px-2 py-0.5 rounded text-slate-600">
+            ${c.pars.filter(p => p === 3).length} Par 3s
+          </span>
+        `;
+        l.appendChild(item);
+      });
+    }
+
+    function saveCustomCourse() {
+      const name = document.getElementById('newCourseName').value.trim();
+      if (!name) { showToast('Please enter a course name'); return; }
+
+      const pars = [];
+      let tot = 0;
+      for (let i = 1; i <= 18; i++) {
+        const p = parseInt(document.getElementById(`parHole${i}`).value, 10) || 4;
+        pars.push(p);
+        tot += p;
+      }
+
+      const newCourse = {
+        id: 'crs_' + Date.now(),
+        name: name,
+        pars: pars,
+        parTotal: tot
+      };
+
+      appState.courses.push(newCourse);
+      appState.selectedCourseId = newCourse.id;
+      saveState();
+
+      renderCourseOptions();
+      renderCourseListInModal();
+      document.getElementById('newCourseName').value = '';
+      closeCourseModal();
+      handleCourseChange();
+      showToast(`Created & selected course: ${name}`);
+    }
+
+    function openCourseModal() { document.getElementById('courseModal').classList.remove('hidden'); }
+    function closeCourseModal() { document.getElementById('courseModal').classList.add('hidden'); }
+
+    /**
+     * View Switcher
+     */
+    function switchTab(viewId) {
+      if (viewId === 'coach' && appState.userRole !== 'coach') {
+        promptRoleSwitch();
+        return;
+      }
+
+      ['entry', 'stats', 'coach'].forEach(v => {
+        const el = document.getElementById(`view${capitalize(v)}`);
+        const btn = document.getElementById(`navBtn${capitalize(v)}`);
+        if (v === viewId) {
+          el?.classList.remove('hidden');
+          btn?.classList.remove('text-slate-400');
+          btn?.classList.add('text-golf-700', 'font-bold');
+        } else {
+          el?.classList.add('hidden');
+          btn?.classList.remove('text-golf-700', 'font-bold');
+          btn?.classList.add('text-slate-400');
+        }
+      });
+
+      if (viewId === 'stats') renderGolferStatsDashboard();
+      if (viewId === 'coach') renderCoachMasterHub();
+
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toastNotification');
+      const text = document.getElementById('toastMessage');
+      text.textContent = msg;
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 3000);
+    }
+
+    function capitalize(str) {
+      if (!str) return '';
+      return str.charAt(0).toUpperCase() + str.slice(1);
+    }
+  </script>
+</body>
+</html>
